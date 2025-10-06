@@ -1,0 +1,44 @@
+const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("delnv")
+    .setDescription("Quita el rol 'No verificado ❌' a los que ya tienen 'Verificado ✅'")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+
+  async execute(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
+    const guild = interaction.guild;
+    if (!guild) return interaction.editReply("❌ Este comando solo funciona en un servidor.");
+
+    // Busca los roles por nombre exacto
+    const rolVerificado = guild.roles.cache.find(r => r.name === "Verificado ✅");
+    const rolNoVerificado = guild.roles.cache.find(r => r.name === "No verificado ❌");
+
+    if (!rolVerificado || !rolNoVerificado) {
+      return interaction.editReply("❌ No se encontraron los roles 'Verificado ✅' o 'No verificado ❌'.");
+    }
+
+    // Filtra los miembros que tienen ambos roles
+    const miembros = guild.members.cache.filter(m =>
+      m.roles.cache.has(rolVerificado.id) && m.roles.cache.has(rolNoVerificado.id)
+    );
+
+    if (miembros.size === 0) {
+      return interaction.editReply("✅ Ningún miembro necesita cambios.");
+    }
+
+    let contador = 0;
+    for (const miembro of miembros.values()) {
+      try {
+        await miembro.roles.remove(rolNoVerificado);
+        contador++;
+      } catch (error) {
+        console.error(`Error al quitar rol a ${miembro.user.tag}:`, error);
+      }
+    }
+
+    interaction.editReply(`✅ Se quitó el rol 'No verificado ❌' a **${contador}** miembros.`);
+  },
+};
