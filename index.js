@@ -2,17 +2,19 @@ import { Client, GatewayIntentBits, Collection, REST, Routes } from "discord.js"
 import fs from "fs";
 import "dotenv/config";
 
+// --------------------
+// Configuración del bot
+// --------------------
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 client.commands = new Collection();
 const commandsArray = [];
 
-// 📂 Cargar comandos automáticamente desde /comandos
+// --------------------
+// Cargar comandos automáticamente
+// --------------------
 const commandFiles = fs.readdirSync("./comandos").filter(f => f.endsWith(".js"));
 
 for (const file of commandFiles) {
@@ -33,7 +35,9 @@ for (const file of commandFiles) {
   }
 }
 
-// 📁 Archivo de warns
+// --------------------
+// Sistema de warns
+// --------------------
 const archivoWarns = "./warns.json";
 
 function cargarWarns() {
@@ -45,27 +49,27 @@ function guardarWarns(data) {
   fs.writeFileSync(archivoWarns, JSON.stringify(data, null, 2));
 }
 
-// 🚀 Cuando el bot está listo
+// --------------------
+// Cuando el bot está listo
+// --------------------
 client.once("ready", async () => {
   console.log(`✅ Bot conectado como ${client.user.tag}`);
 
-  // 🔁 Registrar comandos automáticamente
+  // Registrar comandos en el servidor (inmediato)
   const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
   try {
     await rest.put(
-      // 👉 Si quieres que los comandos solo estén en un servidor específico:
-      // Routes.applicationGuildCommands(client.user.id, "ID_DE_TU_SERVIDOR"),
-      Routes.applicationCommands(client.user.id),
+      Routes.applicationGuildCommands(client.user.id, "1423316216008675462"), // tu ID de servidor
       { body: commandsArray }
     );
-    console.log("✅ Comandos registrados correctamente.");
+    console.log("✅ Comandos registrados correctamente en el servidor.");
   } catch (error) {
     console.error("❌ Error al registrar comandos:", error);
   }
 
-  // 🔁 Reaplicar mutes pendientes
+  // Reaplicar mutes pendientes
   const warns = cargarWarns();
-  const guild = client.guilds.cache.first();
+  const guild = client.guilds.cache.get("1423316216008675462");
   if (!guild) return;
 
   const muteRole = guild.roles.cache.find(r => r.name === "Muted");
@@ -89,32 +93,26 @@ client.once("ready", async () => {
   }
 });
 
-// 🎯 Manejo de interacciones (slash commands)
+// --------------------
+// Manejo de interacciones (slash commands)
+// --------------------
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
-  const member = interaction.member;
-  const rolesPermitidos = ["STAFF", "ADMINISTRADOR"];
-  if (!member.permissions.has("Administrator") &&
-      !member.roles.cache.some(r => rolesPermitidos.includes(r.name))) {
-    return interaction.reply({
-      content: "❌ No tienes permisos para usar este comando.",
-      ephemeral: true
-    });
-  }
-
   try {
-    await command.execute(interaction, { cargarWarns, guardarWarns, client });
+    await command.execute(interaction, { client, cargarWarns, guardarWarns });
   } catch (err) {
     console.error(err);
-    await interaction.reply({
-      content: "❌ Error al ejecutar el comando.",
-      ephemeral: true
-    });
+    if (!interaction.replied) {
+      await interaction.reply({ content: "❌ Error al ejecutar el comando.", ephemeral: true });
+    }
   }
 });
 
+// --------------------
+// Login del bot
+// --------------------
 client.login(process.env.TOKEN);
